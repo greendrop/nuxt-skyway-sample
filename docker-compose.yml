@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  front:
+    build: ./docker/front
+    environment:
+      HOST: 0.0.0.0
+      USER_ID: ${USER_ID}
+      GROUP_ID: ${GROUP_ID}
+    volumes:
+      - .:/app
+      - home_volume:/home/docker
+    working_dir: /app
+    ports:
+      - '3000:3000'
+    entrypoint: ./docker/front/docker-entrypoint.sh
+    command: yarn run dev
+
+volumes:
+  home_volume:
+    driver: local
