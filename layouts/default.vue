@@ -66,6 +66,11 @@ export default {
           icon: 'voice_chat',
           title: 'ビデオ通話(多人数,P2P)',
           to: '/fullmesh_videochat'
+        },
+        {
+          icon: 'voice_chat',
+          title: 'ビデオ配信(1対多,P2P)',
+          to: '/p2p_broadcast'
         }
       ],
       miniVariant: false,

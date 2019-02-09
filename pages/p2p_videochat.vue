@@ -1,5 +1,19 @@
 <template>
   <div>
+    <v-layout
+      row
+      wrap
+    >
+      <v-flex
+        xs12
+        sm12
+        md12
+      >
+        <h1 class="titile">
+          ビデオ通話(1対1,P2P)
+        </h1>
+      </v-flex>
+    </v-layout>
     <v-card class="mx-2 my-2">
       <v-form>
         <v-container>

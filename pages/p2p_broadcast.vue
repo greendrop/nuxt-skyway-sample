@@ -10,17 +10,26 @@
         md12
       >
         <h1 class="titile">
-          ビデオ通話(多人数,P2P)
+          ビデオ配信(1対多,P2P)
         </h1>
       </v-flex>
     </v-layout>
     <v-card class="mx-2 my-2">
-      <v-form>
+      <v-form @submit.prevent="makeBroadcast">
         <v-container>
           <v-layout
             row
             wrap
           >
+            <v-flex
+              xs12
+              sm12
+              md12
+            >
+              <h2 class="headline">
+                配信
+              </h2>
+            </v-flex>
             <v-flex
               xs12
               sm12
@@ -58,10 +67,32 @@
             </v-flex>
           </v-layout>
         </v-container>
+        <v-flex
+          v-if="broadcastStream"
+          xs12
+          sm12
+          md12
+        >
+          <v-card class="mx-2 my-2">
+            <video
+              ref="broadcastVideo"
+              class="video"
+              muted="true"
+              autoplay
+              playsinline
+            />
+          </v-card>
+        </v-flex>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn color="primary" type="submit">
+            配信
+          </v-btn>
+        </v-card-actions>
       </v-form>
     </v-card>
     <v-card class="mx-2 my-2">
-      <v-form ref="form" @submit.prevent="makeRoom">
+      <v-form @submit.prevent="makeReceive">
         <v-container>
           <v-layout
             row
@@ -72,7 +103,16 @@
               sm12
               md12
             >
-              接続先のルーム名を入力して接続してください。
+              <h2 class="headline">
+                受信
+              </h2>
+            </v-flex>
+            <v-flex
+              xs12
+              sm12
+              md12
+            >
+              受信先のPeer IDを入力して接続してください。
             </v-flex>
             <v-flex
               xs12
@@ -80,62 +120,38 @@
               md12
             >
               <v-text-field
-                v-model="roomName"
-                label="ルーム名"
+                v-model="receivePeerId"
+                label="Receive Peer ID"
               />
             </v-flex>
           </v-layout>
         </v-container>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn color="primary" type="submit">
-            接続
-          </v-btn>
-          <v-btn @click="endRoom">
-            切断
-          </v-btn>
-        </v-card-actions>
-      </v-form>
-    </v-card>
-    <v-layout
-      row
-      wrap
-    >
-      <template v-for="theirStream in theirStreams">
         <v-flex
-          v-if="theirStream && theirStream.active"
-          :key="theirStream.id"
+          v-if="receiveStream"
           xs12
           sm12
-          md6
+          md12
         >
           <v-card class="mx-2 my-2">
             <video
-              :ref="`theirVideo${theirStream.id}`"
+              ref="receiveVideo"
               class="video"
               autoplay
               playsinline
             />
           </v-card>
         </v-flex>
-      </template>
-      <v-flex
-        v-if="localStream"
-        xs12
-        sm12
-        md6
-      >
-        <v-card class="mx-2 my-2">
-          <video
-            ref="myVideo"
-            class="video"
-            muted="true"
-            autoplay
-            playsinline
-          />
-        </v-card>
-      </v-flex>
-    </v-layout>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn color="primary" type="submit">
+            接続
+          </v-btn>
+          <v-btn @click="endReceive">
+            切断
+          </v-btn>
+        </v-card-actions>
+      </v-form>
+    </v-card>
   </div>
 </template>
 
@@ -151,19 +167,16 @@ export default {
       selectedVideo: '',
       audios: [],
       videos: [],
-      localStream: null,
-      theirStreams: [],
+      broadcastStream: null,
+      receiveStream: null,
       peerId: '',
-      roomName: '',
-      room: null
+      receivePeerId: '',
+      call: null
     }
   },
   mounted() {
     // オーディオ・ビデオデバイスの準備
     this.prepareAudioVideoDevice()
-
-    // ローカルカメラに接続
-    this.connectLocalCamera()
 
     // Peerオブジェクトの作成
     this.peer = new Peer({ key: process.env.API_KEY, debug: 3 })
@@ -178,6 +191,12 @@ export default {
     })
     this.peer.on('disconnected', () => {
       console.log(`peer event disconnected`)
+    })
+
+    // 着信のイベント設定
+    this.peer.on('call', call => {
+      console.log(`peer event call`)
+      call.answer(this.broadcastStream)
     })
   },
   methods: {
@@ -229,48 +248,41 @@ export default {
         .getUserMedia(constraints)
         .then(stream => {
           this.prepareAudioVideoDevice()
-          this.localStream = stream
+          this.broadcastStream = stream
           this.$nextTick(() => {
-            this.$refs.myVideo.srcObject = stream
-            if (this.room) {
-              this.room.replaceStream(stream)
-            }
+            this.$refs.broadcastVideo.srcObject = stream
           })
         })
         .catch(err => {
           console.error('mediaDevice.getUserMedia() error:', err)
         })
     },
-    // 発信
-    makeRoom: function() {
-      if (this.roomName === '') {
-        return
-      }
-      const room = this.peer.joinRoom(`mesh_video_${this.roomName}`, {
-        stream: this.localStream
-      })
-      this.connectRoom(room)
+    // 配信
+    makeBroadcast: function() {
+      this.connectLocalCamera()
+    },
+    // 受信
+    makeReceive: function() {
+      const call = this.peer.call(this.receivePeerId)
+      this.connectCall(call)
     },
     // 接続
-    connectRoom: function(room) {
-      this.endRoom()
-      this.room = room
-      room.on('stream', stream => {
-        this.theirStreams.push(stream)
+    connectCall: function(call) {
+      this.endReceive()
+      call.on('stream', stream => {
+        this.receiveStream = stream
         this.$nextTick(() => {
-          this.$refs[`theirVideo${stream.id}`][0].srcObject = stream
-          this.$refs[`theirVideo${stream.id}`][0].play()
+          this.$refs.receiveVideo.srcObject = stream
+          this.$refs.receiveVideo.play()
         })
       })
-      room.on('removeStream', stream => {
-        console.log(stream)
-      })
+      this.call = call
     },
     // 切断
-    endRoom: function() {
-      if (this.room) {
-        this.room.close()
-        this.room = null
+    endReceive: function() {
+      if (this.call) {
+        this.call.close()
+        this.call = null
       }
     }
   }
