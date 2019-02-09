@@ -88,21 +88,34 @@
       wrap
     >
       <v-flex
+        v-if="theirStream"
         xs12
         sm12
         md6
       >
         <v-card class="mx-2 my-2">
-          <video id="their-video" class="video" autoplay playsinline />
+          <video
+            ref="theirVideo"
+            class="video"
+            autoplay
+            playsinline
+          />
         </v-card>
       </v-flex>
       <v-flex
+        v-if="localStream"
         xs12
         sm12
         md6
       >
         <v-card class="mx-2 my-2">
-          <video id="my-video" class="video" muted="true" autoplay playsinline />
+          <video
+            ref="myVideo"
+            class="video"
+            muted="true"
+            autoplay
+            playsinline
+          />
         </v-card>
       </v-flex>
     </v-layout>
@@ -122,6 +135,7 @@ export default {
       audios: [],
       videos: [],
       localStream: null,
+      theirStream: null,
       peerId: '',
       callPeerId: '',
       call: null
@@ -190,7 +204,7 @@ export default {
     },
     // ローカルカメラに接続
     connectLocalCamera: function() {
-      const options = {
+      const constraints = {
         audio:
           this.selectedAudio !== ''
             ? { deviceId: { exact: this.selectedAudio } }
@@ -202,11 +216,13 @@ export default {
       }
 
       navigator.mediaDevices
-        .getUserMedia(options)
+        .getUserMedia(constraints)
         .then(stream => {
-          document.getElementById('my-video').srcObject = stream
-          this.localStream = stream
           this.prepareAudioVideoDevice()
+          this.localStream = stream
+          this.$nextTick(() => {
+            this.$refs.myVideo.srcObject = stream
+          })
         })
         .catch(err => {
           console.error('mediaDevice.getUserMedia() error:', err)
@@ -221,9 +237,11 @@ export default {
     connectCall: function(call) {
       this.endCall()
       call.on('stream', stream => {
-        const el = document.getElementById('their-video')
-        el.srcObject = stream
-        el.play()
+        this.theirStream = stream
+        this.$nextTick(() => {
+          this.$refs.theirVideo.srcObject = stream
+          this.$refs.theirVideo.play()
+        })
       })
       this.call = call
     },
