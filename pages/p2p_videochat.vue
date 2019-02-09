@@ -77,7 +77,9 @@
           <v-btn color="primary" type="submit">
             接続
           </v-btn>
-          <v-btn @click="endCall">切断</v-btn>
+          <v-btn @click="endCall">
+            切断
+          </v-btn>
         </v-card-actions>
       </v-form>
     </v-card>
@@ -126,6 +128,12 @@ export default {
     }
   },
   mounted() {
+    // オーディオ・ビデオデバイスの準備
+    this.prepareAudioVideoDevice()
+
+    // ローカルカメラに接続
+    this.connectLocalCamera()
+
     // Peerオブジェクトの作成
     this.peer = new Peer({ key: process.env.API_KEY, debug: 3 })
 
@@ -147,52 +155,62 @@ export default {
       call.answer(this.localStream)
       this.connectCall(call)
     })
-
-    // オーディオ・ビデオデバイスの取得
-    navigator.mediaDevices.enumerateDevices().then(deviceInfos => {
-      for (let i = 0; i !== deviceInfos.length; ++i) {
-        const deviceInfo = deviceInfos[i]
-        if (deviceInfo.kind === 'audioinput') {
-          this.audios.push({
-            text: deviceInfo.label || `Microphone ${this.audios.length + 1}`,
-            value: deviceInfo.deviceId
-          })
-        } else if (deviceInfo.kind === 'videoinput') {
-          this.videos.push({
-            text: deviceInfo.label || `Camera  ${this.videos.length - 1}`,
-            value: deviceInfo.deviceId
-          })
-        }
-      }
-    })
   },
   methods: {
+    // オーディオ・ビデオデバイスを準備
+    prepareAudioVideoDevice: function() {
+      navigator.mediaDevices.enumerateDevices().then(deviceInfos => {
+        const audios = [{ text: '指定なし', value: '' }]
+        const videos = [{ text: '指定なし', value: '' }]
+
+        for (let i = 0; i !== deviceInfos.length; ++i) {
+          const deviceInfo = deviceInfos[i]
+          if (deviceInfo.kind === 'audioinput') {
+            audios.push({
+              text: deviceInfo.label || `Microphone ${this.audios.length + 1}`,
+              value: deviceInfo.deviceId
+            })
+          } else if (deviceInfo.kind === 'videoinput') {
+            videos.push({
+              text: deviceInfo.label || `Camera  ${this.videos.length - 1}`,
+              value: deviceInfo.deviceId
+            })
+          }
+        }
+
+        this.audios = audios
+        this.videos = videos
+      })
+    },
     // オーディオ・ビデオの変更
     changeAudioVideo: function() {
       this.$nextTick(() => {
-        console.log('changeAudioVideo')
-        console.log(this.selectedAudio)
-        console.log(this.selectedVideo)
-        if (this.selectedAudio !== '' && this.selectedVideo !== '') {
-          console.log('true')
-          this.connectLocalCamera()
-        }
+        this.connectLocalCamera()
       })
     },
-    // ローカルカメラに接続する
-    connectLocalCamera: async function() {
+    // ローカルカメラに接続
+    connectLocalCamera: function() {
       const options = {
-        audio: this.selectedAudio
-          ? { deviceId: { exact: this.selectedAudio } }
-          : false,
-        video: this.selectedVideo
-          ? { deviceId: { exact: this.selectedVideo } }
-          : false
+        audio:
+          this.selectedAudio !== ''
+            ? { deviceId: { exact: this.selectedAudio } }
+            : true,
+        video:
+          this.selectedVideo !== ''
+            ? { deviceId: { exact: this.selectedVideo } }
+            : true
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia(options)
-      document.getElementById('my-video').srcObject = stream
-      this.localStream = stream
+      navigator.mediaDevices
+        .getUserMedia(options)
+        .then(stream => {
+          document.getElementById('my-video').srcObject = stream
+          this.localStream = stream
+          this.prepareAudioVideoDevice()
+        })
+        .catch(err => {
+          console.error('mediaDevice.getUserMedia() error:', err)
+        })
     },
     // 発信
     makeCall: function() {
